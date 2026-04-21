@@ -1,0 +1,110 @@
+name: Build OpenWrt
+
+on:
+  workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Switch apt mirror (Tsinghua)
+      run: |
+        sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' /etc/apt/sources.list
+        sudo apt-get update
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        TZ: UTC
+      run: |
+        sudo -E apt-get update
+        sudo -E apt-get -y --no-install-recommends install \
+          build-essential asciidoc binutils bzip2 gawk gettext git \
+          libncurses5-dev libz-dev patch unzip zlib1g-dev lib32gcc-s1 \
+          libc6-dev-i386 subversion flex uglifyjs git-core gcc-multilib \
+          p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto \
+          qemu-utils upx libelf-dev autoconf automake libtool autopoint \
+          device-tree-compiler g++-multilib antlr3 gperf wget curl swig rsync
+    - name: Clone source code
+      run: |
+        git clone -b openwrt-24.10 https://github.com/juesure/immortalwrt.git openwrt
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: SSH connection to Actions
+      uses: P3TERX/ssh2actions@v1.0.0
+      if: github.event.inputs.ssh == 'true'
+      with:
+        args: ${{ secrets.SSH2ACTIONS }}
+
+    - name: Load configuration and verify AX6
+      run: |
+        cd openwrt
+        # 如果仓库根目录有 .config 文件作为基础模板，可以取消下面的注释
+        # [ -e ../.config ] && cp ../.config .config
+        # 根据当前 .config（可能已被 SSH 中修改）生成完整配置
+        make defconfig
+        # 验证是否为红米 AX6
+        if grep -q "CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6=y" .config; then
+            echo "✅ 配置确认：目标设备为红米 AX6"
+        else
+            echo "❌ 错误：当前配置不是 AX6，请检查 .config"
+            grep "CONFIG_TARGET.*DEVICE" .config || true
+            exit 1
+        fi
+    - name: Download package
+      run: |
+        cd openwrt
+        make download -j8
+    - name: Compile the firmware
+      run: |
+        cd openwrt
+        make -j$(nproc) V=s
+    - name: Organize files
+      run: |
+        cd openwrt/bin/targets/
+        mkdir -p ../../../artifact/
+        # 查找所有 .bin 和 .ubi 文件，复制到 artifact 目录
+        find ./ -type f \( -name "*.bin" -o -name "*.ubi" \) -exec cp -rf {} ../../../artifact/ \;
+    - name: Process UBI files
+      run: |
+        cd artifact/
+        # 复制 UBI 文件（如果存在）
+        cp *ubi . 2>/dev/null || true
+        
+        # 如果仍没有 rootfs.ubi，尝试从 sysupgrade.bin 提取
+        if ! ls *rootfs.ubi 1>/dev/null 2>&1; then
+            SYSUPGRADE=$(ls *sysupgrade.bin | head -1)
+            if [ -n "$SYSUPGRADE" ]; then
+                dd if="$SYSUPGRADE" of=redmi_ax6_rootfs.ubi bs=1M skip=4
+                echo "✅ 已从 sysupgrade.bin 提取 rootfs.ubi"
+            fi
+        fi
+        # 确保所有文件在当前目录（artifact）下，供后续上传
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpenWrt_firmware
+        path: artifact/
+
+    - name: Create or Update Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: latest
+        name: "Latest Build_AX6_128M"
+        body: "最新自动构建固件"
+        draft: false
+        prerelease: true
+        files: artifact/*
+        allow_updates: true       # 允许更新已有 Release 的附件
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
