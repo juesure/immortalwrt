@@ -43,31 +43,23 @@ jobs:
       run: |
         cd openwrt
     
-        # 1. 使用官方脚本集成 homeassistant
+        # 1. 使用 sudo 执行 homeassistant 安装脚本（避免 /root 权限问题）
         echo "正在集成 homeassistant_on_openwrt ..."
-        # 脚本执行时可能会依赖 bash、wget 等，GitHub Actions 环境已具备
-        wget -q https://raw.githubusercontent.com/openlumi/homeassistant_on_openwrt/23.05/ha_install.sh -O - | sh
+        wget -q https://raw.githubusercontent.com/openlumi/homeassistant_on_openwrt/23.05/ha_install.sh -O - | sudo sh
     
-        # 2. 集成 turboacc (官方推荐一键脚本)
+        # 2. 集成 turboacc（同样建议 sudo，防患未然）
         echo "正在集成 turboacc ..."
-        curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh | bash
+        curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh | sudo bash
     
-        # 3. 更新 feeds (确保新集成的包被系统识别)
+        # 3. 更新 feeds（不需要 sudo）
         ./scripts/feeds update -a
         ./scripts/feeds install -a
     
-        # 4. 配置 .config 文件（相当于 make menuconfig 的自动化）
+        # 4. 配置 .config（不需要 sudo）
         cat >> .config << EOF
-        # 启用 homeassistant 插件 (包名请以实际 Makefile 为准，常见为 CONFIG_PACKAGE_luci-app-homeassistant=y)
         CONFIG_PACKAGE_luci-app-homeassistant=y
-        # 启用 turboacc 插件
         CONFIG_PACKAGE_luci-app-turboacc=y
-        # 如果 homeassistant 还依赖其他包，脚本可能已自动处理，但为了保险可添加：
-        CONFIG_PACKAGE_homeassistant=y
-        CONFIG_PACKAGE_python3-homeassistant=y
         EOF
-    
-        # 5. 根据配置自动处理依赖关系
         make defconfig
     - name: SSH connection to Actions
       uses: P3TERX/ssh2actions@v1.0.0
