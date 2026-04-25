@@ -59,7 +59,7 @@ jobs:
         CONFIG_PACKAGE_luci-app-homeassistant=y
         CONFIG_PACKAGE_luci-app-turboacc=y
         EOF
-        make defconfig
+        #make defconfig
     - name: SSH connection to Actions
       uses: P3TERX/ssh2actions@v1.0.0
       if: github.event.inputs.ssh == 'true'
