@@ -19,7 +19,7 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
-		bootargs-append = " root=/dev/ubiblock0_1";
+		bootargs-append = " root=/dev/ubiblock0_1 rootfstype=squashfs rootwait";
 	};
 
 	keys {
@@ -193,12 +193,16 @@
 			};
 			partition@a00000 {
 				label = "rootfs";
-				reg = <0x00a00000 0x06640000>;
+				reg = <0xa00000 0xf000000>;
+				compatible = "openwrt,ubi";
 			};
-			partition@7040000 {
+
+			/* Place the real rootfs in the original second rootfs and
+			 * expand it to the end of the nand
+			 */
+			rootfs: partition@fa00000 {
 				label = "rsvd0";
-				reg = <0x07040000 0x00080000>;
-				read-only;
+				reg = <0xfa00000 0x80000>;
 			};
 		};
 	};
