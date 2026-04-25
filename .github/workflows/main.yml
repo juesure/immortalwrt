@@ -45,8 +45,7 @@ jobs:
     
         # 1. 使用 sudo 执行 homeassistant 安装脚本（避免 /root 权限问题）
         echo "正在集成 homeassistant_on_openwrt ..."
-        wget -q https://raw.githubusercontent.com/openlumi/homeassistant_on_openwrt/23.05/ha_install.sh -O - | sudo sh
-    
+        git clone https://github.com/openlumi/homeassistant_on_openwrt.git package/homeassistant_on_openwrt
         # 2. 集成 turboacc（同样建议 sudo，防患未然）
         echo "正在集成 turboacc ..."
         curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh | sudo bash
