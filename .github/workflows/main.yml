@@ -11,7 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -39,7 +40,34 @@ jobs:
         cd openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
-
+    - name: Integrate luci-app-homeassistant and turboacc
+      run: |
+        cd openwrt
+        
+        # 1. 集成 luci-app-homeassistant
+        echo "正在集成 luci-app-homeassistant..."
+        # 注意: 你需要将下方 URL 替换为 luci-app-homeassistant 插件的真实 git 地址
+        # git clone https://github.com/某用户/luci-app-homeassistant.git package/luci-app-homeassistant
+        wget https://raw.githubusercontent.com/openlumi/homeassistant_on_openwrt/23.05/ha_install.sh -O - | sh
+        # 2. 集成 turboacc (使用官方推荐的一键脚本)
+        echo "正在集成 turboacc..."
+        curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh | bash
+        
+        # 3. 更新并安装 feeds (重要: 让新克隆的插件被系统识别)
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+        
+        # 4. 使用 make menuconfig 生成 .config 配置文件
+        #    此处的配置示例包含了两个插件，你需要根据实际情况调整
+        cat >> .config << EOF
+        # 启用 luci-app-homeassistant (包名可能需要调整)
+        CONFIG_PACKAGE_luci-app-homeassistant=y
+        # 启用 turboacc
+        CONFIG_PACKAGE_luci-app-turboacc=y
+        EOF
+        
+        # 更新其他依赖的默认配置
+        make defconfig
     - name: SSH connection to Actions
       uses: P3TERX/ssh2actions@v1.0.0
       if: github.event.inputs.ssh == 'true'
