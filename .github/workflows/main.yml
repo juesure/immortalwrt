@@ -39,9 +39,17 @@ jobs:
         cd openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
-    - name: Remove broken kernel patch
+    - name: Disable broken kernel patch (conntrack)
       run: |
-        rm -f openwrt/target/linux/generic/hack-6.6/952-add-net-conntrack-events-support-multiple-registrant.patch
+        cd openwrt
+        # 检查文件是否存在
+        if [ -f target/linux/generic/hack-6.6/952-add-net-conntrack-events-support-multiple-registrant.patch ]; then
+          # 清空文件内容（而不是删除）
+          echo "" > target/linux/generic/hack-6.6/952-add-net-conntrack-events-support-multiple-registrant.patch
+          echo "Patch file has been disabled."
+        else
+          echo "Patch file not found, skipping."
+        fi
     - name: Integrate homeassistant (using official script) and turboacc
       run: |
         cd openwrt
