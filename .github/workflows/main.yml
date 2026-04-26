@@ -39,6 +39,9 @@ jobs:
         cd openwrt
         ./scripts/feeds update -a
         ./scripts/feeds install -a
+    - name: Remove broken kernel patch
+      run: |
+        rm -f openwrt/target/linux/generic/hack-6.6/952-add-net-conntrack-events-support-multiple-registrant.patch
     - name: Integrate homeassistant (using official script) and turboacc
       run: |
         cd openwrt
